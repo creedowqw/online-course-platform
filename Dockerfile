@@ -6,8 +6,9 @@ COPY go.mod ./
 COPY go.sum ./
 RUN go mod download
 
-COPY ../../AppData/Local/Temp/Rar$DRa12836.3105.rartemp .
+COPY . .
 
+WORKDIR /app/cmd
 RUN go build -o main .
 
 EXPOSE 8080
