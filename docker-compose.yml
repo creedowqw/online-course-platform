@@ -25,6 +25,8 @@ services:
       - .:/app
     working_dir: /app/cmd
     command: ["./main"]
+    environment:
+      - TELEGRAM_BOT_TOKEN=7367769146:AAFzlZX4cxYYvx3GTx_-3taS6F3AAUHJwe8
 
 volumes:
   pgdata:

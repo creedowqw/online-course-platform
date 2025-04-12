@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 	"online-course-platform/models"
 )
 
@@ -13,7 +12,7 @@ func CreateCourse(c *gin.Context) {
 		return
 	}
 
-	if err := db.Create(&course).Error; err != nil {
+	if err := DB.Create(&course).Error; err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
@@ -23,7 +22,7 @@ func CreateCourse(c *gin.Context) {
 func GetCourse(c *gin.Context) {
 	id := c.Param("id")
 	var course models.Course
-	if err := db.First(&course, id).Error; err != nil {
+	if err := DB.First(&course, id).Error; err != nil {
 		c.JSON(404, gin.H{"error": "Course not found"})
 		return
 	}
@@ -33,7 +32,7 @@ func GetCourse(c *gin.Context) {
 func UpdateCourse(c *gin.Context) {
 	id := c.Param("id")
 	var course models.Course
-	if err := db.First(&course, id).Error; err != nil {
+	if err := DB.First(&course, id).Error; err != nil {
 		c.JSON(404, gin.H{"error": "Course not found"})
 		return
 	}
@@ -41,13 +40,13 @@ func UpdateCourse(c *gin.Context) {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-	db.Save(&course)
+	DB.Save(&course)
 	c.JSON(200, course)
 }
 
 func DeleteCourse(c *gin.Context) {
 	id := c.Param("id")
-	if err := db.Delete(&models.Course{}, id).Error; err != nil {
+	if err := DB.Delete(&models.Course{}, id).Error; err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}

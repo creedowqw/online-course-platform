@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 	"online-course-platform/models"
 )
 
@@ -13,7 +12,7 @@ func CreateLesson(c *gin.Context) {
 		return
 	}
 
-	if err := db.Create(&lesson).Error; err != nil {
+	if err := DB.Create(&lesson).Error; err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
@@ -23,7 +22,7 @@ func CreateLesson(c *gin.Context) {
 func GetLessons(c *gin.Context) {
 	courseID := c.Param("course_id")
 	var lessons []models.Lesson
-	if err := db.Where("course_id = ?", courseID).Find(&lessons).Error; err != nil {
+	if err := DB.Where("course_id = ?", courseID).Find(&lessons).Error; err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
