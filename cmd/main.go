@@ -1,13 +1,13 @@
 package main
 
 import (
-	"log"
-	"online-course-platform/controllers"
-	"online-course-platform/models"
-
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"log"
+	"online-course-platform/bot"
+	"online-course-platform/controllers"
+	"online-course-platform/models"
 )
 
 func main() {
@@ -19,6 +19,8 @@ func main() {
 
 	db.AutoMigrate(&models.User{}, &models.Course{}, &models.Lesson{})
 	controllers.InitDatabase(db)
+
+	go bot.StartBot()
 
 	r := gin.Default()
 	courses := r.Group("/courses")
