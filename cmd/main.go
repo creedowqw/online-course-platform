@@ -30,9 +30,12 @@ func main() {
 		courses.PUT("/:id", controllers.UpdateCourse)
 		courses.DELETE("/:id", controllers.DeleteCourse)
 		courses.GET("/:id/lessons", controllers.GetLessons)
-
 	}
+	controllers.InitDatabase(db)
+	controllers.CreateDefaultAdmin()
 
-	r.POST("/lessons", controllers.CreateLesson)
+	r.POST("/users", controllers.CreateUser)
+	r.POST("/login", controllers.Login)
+
 	r.Run(":8080")
 }
