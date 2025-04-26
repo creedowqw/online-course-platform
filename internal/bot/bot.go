@@ -27,8 +27,8 @@ type session struct {
 var (
 	sessions       = make(map[int64]session)
 	sessionsMutex  = sync.RWMutex{}
-	authCodes      = make(map[string]string) // email -> code
-	authEmailState = make(map[int64]string)  // chatID -> email
+	authCodes      = make(map[string]string)
+	authEmailState = make(map[int64]string)
 )
 
 func StartBot() {
@@ -106,7 +106,6 @@ func StartBot() {
 		case "создать курс":
 			if sess.Role == "admin" || sess.Role == "teacher" {
 				bot.Send(tgbotapi.NewMessage(chatID, "Введите название курса:"))
-				// дальше логика создания курса
 			} else {
 				bot.Send(tgbotapi.NewMessage(chatID, "Недостаточно прав."))
 			}
@@ -177,7 +176,6 @@ func registerOrGetUser(email string) SimpleUser {
 	err := db.DB.Where("email = ?", email).First(&user).Error
 
 	if err != nil {
-		// создаём нового студента
 		user = models.User{
 			Name:     name,
 			Email:    email,
@@ -188,8 +186,6 @@ func registerOrGetUser(email string) SimpleUser {
 			log.Println("❌ Ошибка создания пользователя:", err)
 		} else {
 			log.Println("✅ Новый студент сохранён:", user.Email)
-
-			// привязка ко всем курсам
 			var courses []models.Course
 			if err := db.DB.Find(&courses).Error; err == nil {
 				for _, course := range courses {
