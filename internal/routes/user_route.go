@@ -8,7 +8,7 @@ import (
 func SetupUserRoutes(controller controllers.UserController) *gin.Engine {
 	r := gin.Default()
 
-	userRoutes := r.Group("/courses")
+	userRoutes := r.Group("/users")
 	{
 		userRoutes.POST("/login", controller.Login)
 		userRoutes.POST("/register-or-login", controller.RegisterOrLogin)

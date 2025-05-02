@@ -1,0 +1,1 @@
+ALTER TABLE courses ADD COLUMN seats_available INTEGER DEFAULT 30;

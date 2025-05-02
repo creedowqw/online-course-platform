@@ -4,7 +4,8 @@ import "gorm.io/gorm"
 
 type Course struct {
 	gorm.Model
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	TeacherID   uint   `json:"teacher_id"`
+	Title          string `json:"title"`
+	Description    string `json:"description"`
+	TeacherID      uint   `json:"teacher_id"`
+	SeatsAvailable int    `json:"seats_available"`
 }

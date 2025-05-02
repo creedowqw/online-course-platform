@@ -58,7 +58,6 @@ func ensureDefaultTeacher(db *gorm.DB) uint {
 		return teacher.ID
 	}
 
-	// создаём если не найден
 	newTeacher := models.User{
 		Name:     "default_teacher",
 		Email:    "teacher@narxoz.kz",
@@ -86,16 +85,17 @@ func ImportCanvasCoursesToDB() string {
 			continue
 		}
 		course := models.Course{
-			Title:       c.Name,
-			Description: fmt.Sprintf("Canvas ID: %d, Код курса: %s", c.ID, c.CourseCode),
-			TeacherID:   teacherID,
+			Title:          c.Name,
+			Description:    fmt.Sprintf("Canvas ID: %d, Код курса: %s", c.ID, c.CourseCode),
+			TeacherID:      teacherID,
+			SeatsAvailable: 30,
 		}
 		err := db.DB.Create(&course).Error
 		if err == nil {
 			count++
-			fmt.Printf("📥 Импортирован курс: %s\n", course.Title)
+			fmt.Printf("Импортирован курс: %s\n", course.Title)
 		} else {
-			log.Println("❌ Ошибка сохранения курса:", err)
+			log.Println("Ошибка сохранения курса:", err)
 		}
 	}
 	return fmt.Sprintf("Импортировано %d курсов из Canvas", count)
