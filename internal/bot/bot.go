@@ -5,6 +5,7 @@ import (
 	"log"
 	"math/rand"
 	"net/smtp"
+	"online-course-platform/internal/auth"
 	"online-course-platform/internal/db"
 	"online-course-platform/internal/integrations"
 	"online-course-platform/internal/models"
@@ -141,10 +142,19 @@ func handleAuth(bot *tgbotapi.BotAPI, chatID int64, text string) {
 			sessionsMutex.Unlock()
 			delete(authCodes, email)
 			delete(authEmailState, chatID)
+			token, err := auth.GenerateJWT(user.ID, user.Role)
+			if err != nil {
+				bot.Send(tgbotapi.NewMessage(chatID, "Ошибка генерации токена"))
+			} else {
+				msg := tgbotapi.NewMessage(chatID, "Авторизация прошла успешно!\n\nВаш токен для доступа к REST API:\n\n"+token)
+				bot.Send(msg)
+			}
+
 			showMainMenu(bot, chatID, user.Role)
 		} else {
 			bot.Send(tgbotapi.NewMessage(chatID, "Неверный код. Введите заново:"))
 		}
+
 	default:
 		bot.Send(tgbotapi.NewMessage(chatID, "Введите /start чтобы начать регистрацию."))
 	}
@@ -262,7 +272,7 @@ func startAssignTeacher(bot *tgbotapi.BotAPI, chatID int64) {
 func showCourses(bot *tgbotapi.BotAPI, chatID int64) {
 	courses := fetchCourses()
 	if len(courses) == 0 {
-		bot.Send(tgbotapi.NewMessage(chatID, "📭 Курсы отсутствуют."))
+		bot.Send(tgbotapi.NewMessage(chatID, "Курсы отсутствуют."))
 		return
 	}
 

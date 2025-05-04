@@ -5,15 +5,8 @@ import (
 	"online-course-platform/internal/controllers"
 )
 
-func SetupUserRoutes(controller controllers.UserController) *gin.Engine {
-	r := gin.Default()
-
-	userRoutes := r.Group("/users")
-	{
-		userRoutes.POST("/login", controller.Login)
-		userRoutes.POST("/register-or-login", controller.RegisterOrLogin)
-		userRoutes.POST("/update-role", controller.UpdateUserRole)
-	}
-
-	return r
+func RegisterUserRoutes(r *gin.RouterGroup, controller controllers.UserController) {
+	r.POST("/login", controller.Login)
+	r.POST("/register-or-login", controller.RegisterOrLogin)
+	r.POST("/update-role", controller.UpdateUserRole)
 }

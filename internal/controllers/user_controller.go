@@ -1,10 +1,14 @@
 package controllers
 
 import (
+	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
+	"log"
 	"net/http"
 	"online-course-platform/internal/models"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -31,6 +35,16 @@ type RoleUpdateInput struct {
 	Role     string `json:"role"`
 }
 
+func generateJWT(id uint, role string) (string, error) {
+	claims := jwt.MapClaims{
+		"id":   id,
+		"role": role,
+		"exp":  time.Now().Add(time.Hour * 72).Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+}
+
 func (uc *UserController) Login(c *gin.Context) {
 	var input LoginInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -39,14 +53,19 @@ func (uc *UserController) Login(c *gin.Context) {
 	}
 
 	var user models.User
-	if err := uc.DB.Where("name = ? AND password = ?", input.Username, input.Password).First(&user).Error; err != nil {
-		c.JSON(401, gin.H{"error": "Неверный логин или пароль"})
+	if err := uc.DB.Where("name = ?", input.Username).First(&user).Error; err != nil {
+		c.JSON(401, gin.H{"error": "Пользователь не найден"})
 		return
 	}
+
+	token, err := generateJWT(user.ID, user.Role)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Ошибка генерации токена"})
+		return
+	}
+
 	c.JSON(200, gin.H{
-		"id":   user.ID,
-		"name": user.Name,
-		"role": user.Role,
+		"token": token,
 	})
 }
 
@@ -99,4 +118,14 @@ func (uc *UserController) UpdateUserRole(c *gin.Context) {
 	user.Role = input.Role
 	uc.DB.Save(&user)
 	c.JSON(http.StatusOK, gin.H{"message": "Роль обновлена"})
+}
+
+func EnsureAdminExists(db *gorm.DB) models.User {
+	var admin models.User
+	if err := db.Where("email = ?", "admin@narxoz.kz").First(&admin).Error; err != nil {
+		admin = models.User{Name: "admin", Email: "admin@narxoz.kz", Role: "admin"}
+		db.Create(&admin)
+		log.Println("Админ создан: admin@narxoz.kz / admin")
+	}
+	return admin
 }
