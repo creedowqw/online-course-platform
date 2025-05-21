@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/joho/godotenv"
 	"log"
+	"online-course-platform/internal/models"
 	"os"
 	"path/filepath"
 
@@ -66,4 +67,5 @@ func InitDB() {
 		log.Fatal(err)
 	}
 	DB = gormDB
+	DB.AutoMigrate(&models.Grade{})
 }

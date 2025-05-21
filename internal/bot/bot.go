@@ -11,6 +11,7 @@ import (
 	"online-course-platform/internal/models"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -69,6 +70,15 @@ func handleMessage(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
 		return
 	}
 
+	if sess.State == "viewing_teacher_courses" {
+		handleViewStudents(bot, chatID, text)
+		return
+	}
+	if sess.State == "grading" {
+		handleGradeInput(bot, chatID, text)
+		return
+	}
+
 	switch sess.State {
 	case "choosing_course":
 		handleCourseSelection(bot, chatID, text)
@@ -89,7 +99,12 @@ func handleMessage(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
 	case "профиль":
 		showProfile(bot, chatID)
 	case "мои курсы":
-		showUserCourses(bot, chatID)
+		if sess.Role == "teacher" {
+			showTeacherCourses(bot, chatID)
+			return
+		} else {
+			showUserCourses(bot, chatID)
+		}
 	case "назначить роль":
 		if sess.Role == "admin" {
 			sess.State = "changing_role"
@@ -233,7 +248,7 @@ func showMainMenu(bot *tgbotapi.BotAPI, chatID int64, role string) {
 		))
 	case "teacher":
 		rows = append(rows, tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("Курсы"),
+			tgbotapi.NewKeyboardButton("Мои курсы"),
 			tgbotapi.NewKeyboardButton("Профиль"),
 			tgbotapi.NewKeyboardButton("Выход"),
 		))
@@ -345,29 +360,35 @@ func showProfile(bot *tgbotapi.BotAPI, chatID int64) {
 	sess := sessions[chatID]
 
 	var user models.User
-	db.DB.First(&user, sess.UserID)
-
-	var enrollments []models.Enrollment
-	db.DB.Where("user_id = ?", sess.UserID).Find(&enrollments)
-
-	var courseTitles []string
-	for _, enrollment := range enrollments {
-		var course models.Course
-		if err := db.DB.First(&course, enrollment.CourseID).Error; err == nil {
-			courseTitles = append(courseTitles, course.Title)
-		}
+	if err := db.DB.First(&user, sess.UserID).Error; err != nil {
+		bot.Send(tgbotapi.NewMessage(chatID, "Пользователь не найден."))
+		return
 	}
 
 	profile := fmt.Sprintf(
-		"Имя: %s\nEmail: %s\nРоль: %s\nКурсы:\n- %s",
+		"Имя: %s\nEmail: %s\nРоль: %s",
 		user.Name,
 		user.Email,
 		user.Role,
-		strings.Join(courseTitles, "\n- "),
 	)
 
-	if len(courseTitles) == 0 {
-		profile += "-"
+	if user.Role == "student" {
+		var enrollments []models.Enrollment
+		db.DB.Where("user_id = ?", sess.UserID).Find(&enrollments)
+
+		var courseTitles []string
+		for _, enrollment := range enrollments {
+			var course models.Course
+			if err := db.DB.First(&course, enrollment.CourseID).Error; err == nil {
+				courseTitles = append(courseTitles, course.Title)
+			}
+		}
+
+		if len(courseTitles) > 0 {
+			profile += "\nКурсы:\n- " + strings.Join(courseTitles, "\n- ")
+		} else {
+			profile += "\nКурсы: -"
+		}
 	}
 
 	bot.Send(tgbotapi.NewMessage(chatID, profile))
@@ -482,4 +503,108 @@ func handleChangeRole(bot *tgbotapi.BotAPI, chatID int64, text string) {
 	bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("%s теперь %s", username, newRole)))
 	resetState(chatID)
 	showMainMenu(bot, chatID, sessions[chatID].Role)
+}
+
+func showTeacherCourses(bot *tgbotapi.BotAPI, chatID int64) {
+	sess := sessions[chatID]
+	var courses []models.Course
+	db.DB.Where("teacher_id = ?", sess.UserID).Find(&courses)
+
+	if len(courses) == 0 {
+		bot.Send(tgbotapi.NewMessage(chatID, "У вас нет курсов."))
+		return
+	}
+
+	msg := tgbotapi.NewMessage(chatID, "Ваши курсы:")
+	var rows [][]tgbotapi.KeyboardButton
+	for _, course := range courses {
+		rows = append(rows, tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton(course.Title),
+		))
+	}
+	rows = append(rows, tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Назад")))
+	msg.ReplyMarkup = tgbotapi.NewReplyKeyboard(rows...)
+
+	sessionsMutex.Lock()
+	sess.State = "viewing_teacher_courses"
+	sessions[chatID] = sess
+	sessionsMutex.Unlock()
+
+	bot.Send(msg)
+}
+
+func handleViewStudents(bot *tgbotapi.BotAPI, chatID int64, courseTitle string) {
+	var course models.Course
+	if err := db.DB.Where("LOWER(title) = ? AND teacher_id = ?", courseTitle, sessions[chatID].UserID).First(&course).Error; err != nil {
+		bot.Send(tgbotapi.NewMessage(chatID, "Курс не найден."))
+		return
+	}
+
+	var enrollments []models.Enrollment
+	db.DB.Where("course_id = ?", course.ID).Find(&enrollments)
+
+	if len(enrollments) == 0 {
+		bot.Send(tgbotapi.NewMessage(chatID, "На этот курс никто не записан."))
+
+		resetState(chatID)
+		showMainMenu(bot, chatID, sessions[chatID].Role)
+		return
+	}
+
+	var studentsText strings.Builder
+	studentsText.WriteString("Студенты курса:\n")
+	for _, e := range enrollments {
+		var student models.User
+		db.DB.First(&student, e.UserID)
+
+		var grade models.Grade
+		db.DB.Where("user_id = ? AND course_id = ?", student.ID, course.ID).First(&grade)
+
+		studentsText.WriteString(fmt.Sprintf("- %s (%s) — оценка: %v\n", student.Name, student.Email, grade.Score))
+	}
+
+	bot.Send(tgbotapi.NewMessage(chatID, studentsText.String()))
+	bot.Send(tgbotapi.NewMessage(chatID, "Введите: имя_студента оценка, чтобы поставить/обновить оценку."))
+
+	sessionsMutex.Lock()
+	sess := sessions[chatID]
+	sess.State = "grading"
+	sess.TempCourseID = course.ID
+	sessions[chatID] = sess
+	sessionsMutex.Unlock()
+}
+
+func handleGradeInput(bot *tgbotapi.BotAPI, chatID int64, text string) {
+	parts := strings.Split(text, " ")
+	if len(parts) != 2 {
+		bot.Send(tgbotapi.NewMessage(chatID, "Неверный формат. Введите: имя_студента оценка"))
+		return
+	}
+
+	studentName := parts[0]
+	score, err := strconv.Atoi(parts[1])
+	if err != nil {
+		bot.Send(tgbotapi.NewMessage(chatID, "Оценка должна быть числом."))
+		return
+	}
+
+	sess := sessions[chatID]
+	var student models.User
+	if err := db.DB.Where("name = ?", studentName).First(&student).Error; err != nil {
+		bot.Send(tgbotapi.NewMessage(chatID, "Студент не найден."))
+		return
+	}
+
+	var grade models.Grade
+	if err := db.DB.Where("user_id = ? AND course_id = ?", student.ID, sess.TempCourseID).First(&grade).Error; err != nil {
+		grade = models.Grade{UserID: student.ID, CourseID: sess.TempCourseID, Score: score}
+		db.DB.Create(&grade)
+	} else {
+		grade.Score = score
+		db.DB.Save(&grade)
+	}
+
+	bot.Send(tgbotapi.NewMessage(chatID, "Оценка сохранена."))
+	resetState(chatID)
+	showMainMenu(bot, chatID, sess.Role)
 }
